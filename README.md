@@ -36,7 +36,7 @@ It scans **NSE F&O stocks** (India) and selected **US stocks** for new **Highs a
 1️⃣ Clone or download this repository
 bash
 Copy code
-git clone [https://github.com/yourusername/stock-scanner.git](https://github.com/Pratham4923/Breakout-Stocks.git)
+git clone https://github.com/Pratham4923/Breakout-Stocks.git
 cd stock-scanner
 2️⃣ Install dependencies
 bash

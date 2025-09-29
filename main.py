@@ -1,10 +1,12 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import datetime
+from datetime import datetime, time
+from streamlit_autorefresh import st_autorefresh
 
-# ---------------- SETTINGS ---------------- #
-STOCKS = [
+# ---------------- STOCK LIST ---------------- #
+stocks = [ 
+    # NSE
     "360ONE.NS", "ABB.NS", "ABBOTINDIA.NS", "ABCAPITAL.NS", "ABFRL.NS", "ACC.NS",
     "ADANIENSOL.NS", "ADANIENT.NS", "ADANIGREEN.NS", "ADANIPORTS.NS", "ALKEM.NS",
     "AMBER.NS", "AMBUJACEM.NS", "ANGELONE.NS", "APOLLOHOSP.NS", "APOLLOTYRE.NS",
@@ -37,12 +39,12 @@ STOCKS = [
     "MARICO.NS", "MARUTI.NS", "MAZDOCK.NS", "MCX.NS", "METROPOLIS.NS",
     "MFSL.NS", "MGL.NS", "MOTHERSON.NS", "MPHASIS.NS", "MRF.NS", "MUTHOOTFIN.NS",
     "NBCC.NS", "NCC.NS", "NHPC.NS", "NMDC.NS", "NTPC.NS", "NATIONALUM.NS",
-    "NAUKRI.NS", "NAVINFLUOR.NS", "NESTLEIND.NS", "NMDC.NS", "NTPC.NS",
-    "NUVAMA.NS", "NYKAA.NS", "OBEROIRLTY.NS", "OFSS.NS", "OIL.NS", "ONGC.NS",
-    "PAGEIND.NS", "PATANJALI.NS", "PAYTM.NS", "PERSISTENT.NS",
-    "PETRONET.NS", "PFC.NS", "PIDILITIND.NS", "PIIND.NS", "PNB.NS", "PNBHOUSING.NS",
-    "POLICYBZR.NS", "POLYCAB.NS", "POWERGRID.NS", "PRESTIGE.NS", "PPLPHARMA.NS",
-    "PSB.NS", "RAIN.NS", "RAMCOCEM.NS", "RBLBANK.NS", "RECLTD.NS", "RELIANCE.NS",
+    "NAUKRI.NS", "NAVINFLUOR.NS", "NESTLEIND.NS", "NUVAMA.NS", "NYKAA.NS",
+    "OBEROIRLTY.NS", "OFSS.NS", "OIL.NS", "ONGC.NS", "PAGEIND.NS",
+    "PATANJALI.NS", "PAYTM.NS", "PERSISTENT.NS", "PETRONET.NS", "PFC.NS",
+    "PIDILITIND.NS", "PIIND.NS", "PNB.NS", "PNBHOUSING.NS", "POLICYBZR.NS",
+    "POLYCAB.NS", "POWERGRID.NS", "PRESTIGE.NS", "PPLPHARMA.NS", "PSB.NS",
+    "RAIN.NS", "RAMCOCEM.NS", "RBLBANK.NS", "RECLTD.NS", "RELIANCE.NS",
     "RVNL.NS", "SAIL.NS", "SBICARD.NS", "SBILIFE.NS", "SBIN.NS", "SHREECEM.NS",
     "SHRIRAMFIN.NS", "SIEMENS.NS", "SOLARINDS.NS", "SONACOMS.NS", "SRF.NS",
     "SUNPHARMA.NS", "SUNTV.NS", "SYNGENE.NS", "SAMMAANCAP.NS", "SUPREMEIND.NS",
@@ -51,109 +53,95 @@ STOCKS = [
     "TECHM.NS", "TIINDIA.NS", "TITAGARH.NS", "TITAN.NS", "TORNTPHARM.NS",
     "TORNTPOWER.NS", "TRENT.NS", "TVSMOTOR.NS", "UBL.NS", "ULTRACEMCO.NS",
     "UNIONBANK.NS", "UNITDSPR.NS", "UNOMINDA.NS", "UPL.NS", "VBL.NS", "VEDL.NS",
-    "VOLTAS.NS", "WHIRLPOOL.NS", "WIPRO.NS", "YESBANK.NS", "ZEEL.NS", "ZYDUSLIFE.NS"
+    "VOLTAS.NS", "WHIRLPOOL.NS", "WIPRO.NS", "YESBANK.NS", "ZEEL.NS", "ZYDUSLIFE.NS",
 ]
-REFRESH_INTERVAL = 8  # seconds
-MARKET_OPEN = datetime.time(9, 30)
-MARKET_CLOSE = datetime.time(15, 30)
-# ------------------------------------------ #
 
-st.set_page_config(page_title="Stock Breakout Scanner", layout="wide")
+# ---------------- STREAMLIT SETUP ---------------- #
+st.set_page_config(page_title="Stock Scanner", layout="wide")
 
-# Check if market is open
-def is_market_open():
-    now = datetime.datetime.now().time()
-    return MARKET_OPEN <= now <= MARKET_CLOSE
+# Hide Streamlit UI
+hide_st = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+"""
+st.markdown(hide_st, unsafe_allow_html=True)
 
-# Fetch stock data
-def fetch_stock_data(symbol):
+# ---------------- FUNCTIONS ---------------- #
+@st.cache_data(ttl=60)
+def get_history(symbol, period="1y"):
     try:
-        ticker = yf.Ticker(symbol)
-        hist = ticker.history(period="1y")
-        if hist.empty:
-            return None
+        return yf.Ticker(symbol).history(period=period, interval="1d")
+    except:
+        return pd.DataFrame()
 
-        ltp = hist["Close"].iloc[-1]
-        prev_close = hist["Close"].iloc[-2] if len(hist) > 1 else ltp
-        change_pct = ((ltp - prev_close) / prev_close) * 100 if prev_close else 0
+def check_breakouts(symbol):
+    data = get_history(symbol)
+    if data.empty:
+        return []
 
-        return {
-            "Symbol": symbol,
-            "LTP": round(ltp, 2),
-            "Change %": round(change_pct, 2),
-            "Day High": hist["High"].iloc[-1],
-            "Day Low": hist["Low"].iloc[-1],
-            "2D High": hist["High"].iloc[-2:].max(),
-            "2D Low": hist["Low"].iloc[-2:].min(),
-            "Week High": hist["High"].iloc[-5:].max(),
-            "Week Low": hist["Low"].iloc[-5:].min(),
-            "2W High": hist["High"].iloc[-10:].max(),
-            "2W Low": hist["Low"].iloc[-10:].min(),
-            "Month High": hist["High"].iloc[-22:].max(),
-            "Month Low": hist["Low"].iloc[-22:].min(),
-            "3M High": hist["High"].iloc[-66:].max(),
-            "3M Low": hist["Low"].iloc[-66:].min(),
-            "52W High": hist["High"].max(),
-            "52W Low": hist["Low"].min(),
-        }
-    except Exception:
-        return None
+    ltp = data["Close"].iloc[-1]
+    prev_close = data["Close"].iloc[-2] if len(data) > 1 else ltp
+    change_pct = round(((ltp - prev_close) / prev_close) * 100, 2) if prev_close else 0
 
-# Find breakout entries
-def breakout_entries(row):
-    ltp = row["LTP"]
-    entries = []
     conditions = {
-        "Day High": ltp >= row["Day High"],
-        "Day Low": ltp <= row["Day Low"],
-        "2D High": ltp >= row["2D High"],
-        "2D Low": ltp <= row["2D Low"],
-        "Week High": ltp >= row["Week High"],
-        "Week Low": ltp <= row["Week Low"],
-        "2W High": ltp >= row["2W High"],
-        "2W Low": ltp <= row["2W Low"],
-        "Month High": ltp >= row["Month High"],
-        "Month Low": ltp <= row["Month Low"],
-        "3M High": ltp >= row["3M High"],
-        "3M Low": ltp <= row["3M Low"],
-        "52W High": ltp >= row["52W High"],
-        "52W Low": ltp <= row["52W Low"],
+        "Day High": ltp >= data["High"].iloc[-1],
+        "2-Day High": ltp >= data["High"].iloc[-2:].max(),
+        "Week High": ltp >= data["High"].iloc[-5:].max(),
+        "2-Week High": ltp >= data["High"].iloc[-10:].max(),
+        "Month High": ltp >= data["High"].iloc[-22:].max(),
+        "3-Month High": ltp >= data["High"].iloc[-66:].max(),
+        "52-Week High": ltp >= data["High"].max(),
+        "Day Low": ltp <= data["Low"].iloc[-1],
+        "2-Day Low": ltp <= data["Low"].iloc[-2:].min(),
+        "Week Low": ltp <= data["Low"].iloc[-5:].min(),
+        "2-Week Low": ltp <= data["Low"].iloc[-10:].min(),
+        "Month Low": ltp <= data["Low"].iloc[-22:].min(),
+        "3-Month Low": ltp <= data["Low"].iloc[-66:].min(),
+        "52-Week Low": ltp <= data["Low"].min(),
     }
-    for cond, hit in conditions.items():
-        if hit:
-            entries.append({
-                "Symbol": row["Symbol"],
-                "LTP": row["LTP"],
-                "Change %": row["Change %"],
-                "Condition": cond,
-                "Time": datetime.datetime.now().strftime("%H:%M:%S")
+
+    results = []
+    for label, condition in conditions.items():
+        if condition:
+            results.append({
+                "Symbol": symbol,
+                "LTP": round(ltp, 2),
+                "Change %": change_pct,
+                "Condition": label,
+                "Time": datetime.now().strftime("%H:%M:%S")
             })
-    return entries
+    return results
 
-# Highlight rows
-def highlight_row(row):
-    if "High" in row["Condition"]:
-        return ["background-color: lightgreen"] * len(row)
-    elif "Low" in row["Condition"]:
-        return ["background-color: salmon"] * len(row)
-    return [""] * len(row)
+# ---------------- MARKET HOURS CHECK ---------------- #
+def is_market_open():
+    now = datetime.now().time()
+    start, end = time(9, 30), time(15, 30)
+    return start <= now <= end
 
-# Title
-st.title("📊 Stock Breakout Scanner")
+# ---------------- MAIN APP ---------------- #
+st.title("📈 NSE Stock High/Low Scanner")
 
-# Main app
 if is_market_open():
-    all_entries = []
-    for stock in STOCKS:
-        data = fetch_stock_data(stock)
-        if data:
-            all_entries.extend(breakout_entries(data))
+    all_results = []
+    for stock in stocks:
+        all_results.extend(check_breakouts(stock))
 
-    if all_entries:
-        df = pd.DataFrame(all_entries)
-        st.dataframe(df.style.apply(highlight_row, axis=1), use_container_width=True)
+    df = pd.DataFrame(all_results)
+
+    if not df.empty:
+        def highlight(row):
+            color = "background-color: green; color: white;" if "High" in row["Condition"] else "background-color: red; color: white;"
+            return [color] * len(row)
+
+        st.dataframe(df.style.apply(highlight, axis=1), use_container_width=True)
     else:
-        st.info("✅ No breakouts at the moment.")
+        st.info("⚡ No breakouts detected right now")
+
+    # Auto refresh every 8s
+    st_autorefresh(interval=8000, limit=None, key="refresh_key")
 
 else:
-    st.warning("⏳ Market is closed. The scanner runs from 9:30 AM to 3:30 PM.")
+    st.warning("⏳ Market is closed. Scanner runs between **9:30 AM - 3:30 PM IST**.")

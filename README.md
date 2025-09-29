@@ -6,15 +6,16 @@ It scans **NSE F&O stocks** (India) and selected **US stocks** for new **Highs a
 ---
 
 ## ⚡ Features
-- Monitors **NSE F&O stocks only** (with few US tickers like TSLA, NVDA, META, etc.)
+- Monitors **NSE F&O stocks only** 
 - Detects breakouts on:
   - Day High/Low  
-  - 2 Days  
-  - Week  
-  - 2 Weeks  
-  - Month  
-  - 3 Months  
-  - 52 Weeks  
+  - 2 Days High/Low 
+  - Week  High/Low 
+  - 2 Weeks  High/Low 
+  - Month  High/Low 
+  - 3 Months  High/Low 
+  - 52 Weeks  High/Low
+    
 - Displays **symbol, LTP, % change, timestamp**
 - Color-coded:
   - 🟩 Green → New High  
@@ -32,25 +33,20 @@ It scans **NSE F&O stocks** (India) and selected **US stocks** for new **Highs a
   yfinance>=0.2.31
   pandas>=2.0.3
   numpy>=1.25.0
+  
 🚀 Setup & Run
-1️⃣ Clone or download this repository
-bash
 
+1️⃣ Clone or download this repository
 
 git clone https://github.com/Pratham4923/Breakout-Stocks.git
 
 cd stock-scanner
 
 2️⃣ Install dependencies
-bash
-
-
 
 pip install -r requirements.txt
 
 3️⃣ Run the app
-bash
-
 
 streamlit run test.py
 
@@ -66,8 +62,11 @@ setup_and_run.bat
 bash
 
 chmod +x setup_and_run.sh
+
 ./setup_and_run.sh
+
 📌 Notes
+
 Only NSE F&O stocks are supported for Indian markets
 
 Recommended usage: Run only during NSE market hours (9:30 AM – 3:30 PM IST) for best performance

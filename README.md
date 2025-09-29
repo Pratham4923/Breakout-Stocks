@@ -35,28 +35,36 @@ It scans **NSE F&O stocks** (India) and selected **US stocks** for new **Highs a
 🚀 Setup & Run
 1️⃣ Clone or download this repository
 bash
-Copy code
+
+
 git clone https://github.com/Pratham4923/Breakout-Stocks.git
+
 cd stock-scanner
+
 2️⃣ Install dependencies
 bash
-Copy code
+
+
+
 pip install -r requirements.txt
+
 3️⃣ Run the app
 bash
-Copy code
+
+
 streamlit run test.py
+
 ⚡ One-Click Launch
 We’ve included launch scripts for Windows and Linux/Mac:
 
 ▶ Windows
 Double-click:
 
-Copy code
 setup_and_run.bat
+
 ▶ Linux/Mac
 bash
-Copy code
+
 chmod +x setup_and_run.sh
 ./setup_and_run.sh
 📌 Notes

@@ -6,7 +6,7 @@ import time
 
 # Config
 REFRESH_INTERVAL = 8  # seconds
-INDIAN_MARKET_START = dt.time(9, 30)
+INDIAN_MARKET_START = dt.time(9, 15)
 INDIAN_MARKET_END = dt.time(15, 30)
 
 # NSE F&O + Extra US stocks
@@ -111,7 +111,7 @@ st.title("📊 Stock Breakout Scanner (NSE F&O + US Stocks)")
 
 current_time = dt.datetime.now().time()
 if not (INDIAN_MARKET_START <= current_time <= INDIAN_MARKET_END):
-    st.warning("⚠️ Market closed. App runs between 9:30 AM - 3:30 PM IST.")
+    st.warning("⚠️ Market closed. App runs between 9:15 AM - 3:30 PM IST.")
 else:
     all_results = []
     for stock in stocks:
@@ -135,3 +135,4 @@ else:
     # Auto refresh logic
     time.sleep(REFRESH_INTERVAL)
     st.rerun()
+

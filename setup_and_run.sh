@@ -21,4 +21,4 @@ pip install -r requirements.txt
 
 # Step 5 - Run the Streamlit app
 echo "Starting Streamlit app..."
-streamlit run test.py
+streamlit run main.py

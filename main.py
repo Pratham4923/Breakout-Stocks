@@ -1,12 +1,16 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-from datetime import datetime, time
-from streamlit_autorefresh import st_autorefresh
+import datetime as dt
+import time
 
-# ---------------- STOCK LIST ---------------- #
-stocks = [ 
-    # NSE
+# Config
+REFRESH_INTERVAL = 8  # seconds
+INDIAN_MARKET_START = dt.time(9, 30)
+INDIAN_MARKET_END = dt.time(15, 30)
+
+# NSE F&O + Extra US stocks
+stocks = [
     "360ONE.NS", "ABB.NS", "ABBOTINDIA.NS", "ABCAPITAL.NS", "ABFRL.NS", "ACC.NS",
     "ADANIENSOL.NS", "ADANIENT.NS", "ADANIGREEN.NS", "ADANIPORTS.NS", "ALKEM.NS",
     "AMBER.NS", "AMBUJACEM.NS", "ANGELONE.NS", "APOLLOHOSP.NS", "APOLLOTYRE.NS",
@@ -39,12 +43,12 @@ stocks = [
     "MARICO.NS", "MARUTI.NS", "MAZDOCK.NS", "MCX.NS", "METROPOLIS.NS",
     "MFSL.NS", "MGL.NS", "MOTHERSON.NS", "MPHASIS.NS", "MRF.NS", "MUTHOOTFIN.NS",
     "NBCC.NS", "NCC.NS", "NHPC.NS", "NMDC.NS", "NTPC.NS", "NATIONALUM.NS",
-    "NAUKRI.NS", "NAVINFLUOR.NS", "NESTLEIND.NS", "NUVAMA.NS", "NYKAA.NS",
-    "OBEROIRLTY.NS", "OFSS.NS", "OIL.NS", "ONGC.NS", "PAGEIND.NS",
-    "PATANJALI.NS", "PAYTM.NS", "PERSISTENT.NS", "PETRONET.NS", "PFC.NS",
-    "PIDILITIND.NS", "PIIND.NS", "PNB.NS", "PNBHOUSING.NS", "POLICYBZR.NS",
-    "POLYCAB.NS", "POWERGRID.NS", "PRESTIGE.NS", "PPLPHARMA.NS", "PSB.NS",
-    "RAIN.NS", "RAMCOCEM.NS", "RBLBANK.NS", "RECLTD.NS", "RELIANCE.NS",
+    "NAUKRI.NS", "NAVINFLUOR.NS", "NESTLEIND.NS", "NMDC.NS", "NTPC.NS",
+    "NUVAMA.NS", "NYKAA.NS", "OBEROIRLTY.NS", "OFSS.NS", "OIL.NS", "ONGC.NS",
+    "PAGEIND.NS", "PATANJALI.NS", "PAYTM.NS", "PERSISTENT.NS",
+    "PETRONET.NS", "PFC.NS", "PIDILITIND.NS", "PIIND.NS", "PNB.NS", "PNBHOUSING.NS",
+    "POLICYBZR.NS", "POLYCAB.NS", "POWERGRID.NS", "PRESTIGE.NS", "PPLPHARMA.NS",
+    "PSB.NS", "RAIN.NS", "RAMCOCEM.NS", "RBLBANK.NS", "RECLTD.NS", "RELIANCE.NS",
     "RVNL.NS", "SAIL.NS", "SBICARD.NS", "SBILIFE.NS", "SBIN.NS", "SHREECEM.NS",
     "SHRIRAMFIN.NS", "SIEMENS.NS", "SOLARINDS.NS", "SONACOMS.NS", "SRF.NS",
     "SUNPHARMA.NS", "SUNTV.NS", "SYNGENE.NS", "SAMMAANCAP.NS", "SUPREMEIND.NS",
@@ -53,95 +57,81 @@ stocks = [
     "TECHM.NS", "TIINDIA.NS", "TITAGARH.NS", "TITAN.NS", "TORNTPHARM.NS",
     "TORNTPOWER.NS", "TRENT.NS", "TVSMOTOR.NS", "UBL.NS", "ULTRACEMCO.NS",
     "UNIONBANK.NS", "UNITDSPR.NS", "UNOMINDA.NS", "UPL.NS", "VBL.NS", "VEDL.NS",
-    "VOLTAS.NS", "WHIRLPOOL.NS", "WIPRO.NS", "YESBANK.NS", "ZEEL.NS", "ZYDUSLIFE.NS",
+    "VOLTAS.NS", "WHIRLPOOL.NS", "WIPRO.NS", "YESBANK.NS", "ZEEL.NS", "ZYDUSLIFE.NS"
 ]
 
-# ---------------- STREAMLIT SETUP ---------------- #
-st.set_page_config(page_title="Stock Scanner", layout="wide")
+# Breakout periods
+periods = {
+    "DAY HIGH": "1d",
+    "DAY LOW": "1d",
+    "WEEK HIGH": "5d",
+    "WEEK LOW": "5d",
+    "MONTH HIGH": "1mo",
+    "MONTH LOW": "1mo",
+    "3M HIGH": "3mo",
+    "3M LOW": "3mo",
+    "52W HIGH": "1y",
+    "52W LOW": "1y"
+}
 
-# Hide Streamlit UI
-hide_st = """
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    </style>
-"""
-st.markdown(hide_st, unsafe_allow_html=True)
-
-# ---------------- FUNCTIONS ---------------- #
-@st.cache_data(ttl=60)
+@st.cache_data
 def get_history(symbol, period="1y"):
     try:
-        return yf.Ticker(symbol).history(period=period, interval="1d")
-    except:
+        return yf.Ticker(symbol).history(period=period)
+    except Exception:
         return pd.DataFrame()
 
 def check_breakouts(symbol):
+    results = []
     data = get_history(symbol)
     if data.empty:
-        return []
+        return results
 
     ltp = data["Close"].iloc[-1]
     prev_close = data["Close"].iloc[-2] if len(data) > 1 else ltp
-    change_pct = round(((ltp - prev_close) / prev_close) * 100, 2) if prev_close else 0
+    change_pct = ((ltp - prev_close) / prev_close) * 100 if prev_close else 0
+    now = dt.datetime.now().strftime("%d %b %Y, %I:%M:%S %p")
 
-    conditions = {
-        "Day High": ltp >= data["High"].iloc[-1],
-        "2-Day High": ltp >= data["High"].iloc[-2:].max(),
-        "Week High": ltp >= data["High"].iloc[-5:].max(),
-        "2-Week High": ltp >= data["High"].iloc[-10:].max(),
-        "Month High": ltp >= data["High"].iloc[-22:].max(),
-        "3-Month High": ltp >= data["High"].iloc[-66:].max(),
-        "52-Week High": ltp >= data["High"].max(),
-        "Day Low": ltp <= data["Low"].iloc[-1],
-        "2-Day Low": ltp <= data["Low"].iloc[-2:].min(),
-        "Week Low": ltp <= data["Low"].iloc[-5:].min(),
-        "2-Week Low": ltp <= data["Low"].iloc[-10:].min(),
-        "Month Low": ltp <= data["Low"].iloc[-22:].min(),
-        "3-Month Low": ltp <= data["Low"].iloc[-66:].min(),
-        "52-Week Low": ltp <= data["Low"].min(),
-    }
+    for label, period in periods.items():
+        df = get_history(symbol, period=period)
+        if df.empty:
+            continue
+        high = df["High"].max()
+        low = df["Low"].min()
 
-    results = []
-    for label, condition in conditions.items():
-        if condition:
-            results.append({
-                "Symbol": symbol,
-                "LTP": round(ltp, 2),
-                "Change %": change_pct,
-                "Condition": label,
-                "Time": datetime.now().strftime("%H:%M:%S")
-            })
+        if "HIGH" in label and ltp >= high:
+            results.append([symbol, round(ltp, 2), round(change_pct, 2), label, now, "High"])
+        elif "LOW" in label and ltp <= low:
+            results.append([symbol, round(ltp, 2), round(change_pct, 2), label, now, "Low"])
     return results
 
-# ---------------- MARKET HOURS CHECK ---------------- #
-def is_market_open():
-    now = datetime.now().time()
-    start, end = time(9, 30), time(15, 30)
-    return start <= now <= end
+# Streamlit app
+st.set_page_config(page_title="Stock Breakout Scanner", layout="wide")
+st.title("📊 Stock Breakout Scanner (NSE F&O + US Stocks)")
 
-# ---------------- MAIN APP ---------------- #
-st.title("📈 NSE Stock High/Low Scanner")
-
-if is_market_open():
+current_time = dt.datetime.now().time()
+if not (INDIAN_MARKET_START <= current_time <= INDIAN_MARKET_END):
+    st.warning("⚠️ Market closed. App runs between 9:30 AM - 3:30 PM IST.")
+else:
     all_results = []
     for stock in stocks:
         all_results.extend(check_breakouts(stock))
 
-    df = pd.DataFrame(all_results)
+    if all_results:
+        df = pd.DataFrame(all_results, columns=["Symbol", "LTP", "%change", "Event", "Time", "Type"])
+        df = df.drop(columns=["Type"])  # Keep only display columns
 
-    if not df.empty:
         def highlight(row):
-            color = "background-color: green; color: white;" if "High" in row["Condition"] else "background-color: red; color: white;"
-            return [color] * len(row)
+            if "HIGH" in row["Event"]:
+                return ["background-color: lightgreen"] * len(row)
+            elif "LOW" in row["Event"]:
+                return ["background-color: salmon"] * len(row)
+            return [""] * len(row)
 
         st.dataframe(df.style.apply(highlight, axis=1), use_container_width=True)
     else:
-        st.info("⚡ No breakouts detected right now")
+        st.info("No breakouts found right now.")
 
-    # Auto refresh every 8s
-    st_autorefresh(interval=8000, limit=None, key="refresh_key")
-
-else:
-    st.warning("⏳ Market is closed. Scanner runs between **9:30 AM - 3:30 PM IST**.")
+    # Auto refresh logic
+    time.sleep(REFRESH_INTERVAL)
+    st.rerun()

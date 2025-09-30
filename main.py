@@ -2,15 +2,15 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import datetime as dt
-import time
+import pytz
+import gc
+from streamlit_autorefresh import st_autorefresh
 
-# Config
-REFRESH_INTERVAL = 8  # seconds
-INDIAN_MARKET_START = dt.time(9, 15)
-INDIAN_MARKET_END = dt.time(15, 30)
+# Timezone for India
+IST = pytz.timezone("Asia/Kolkata")
 
-# NSE F&O + Extra US stocks
-stocks = [
+# List of NSE stock symbols
+STOCKS = [
     "360ONE.NS", "ABB.NS", "ABBOTINDIA.NS", "ABCAPITAL.NS", "ABFRL.NS", "ACC.NS",
     "ADANIENSOL.NS", "ADANIENT.NS", "ADANIGREEN.NS", "ADANIPORTS.NS", "ALKEM.NS",
     "AMBER.NS", "AMBUJACEM.NS", "ANGELONE.NS", "APOLLOHOSP.NS", "APOLLOTYRE.NS",
@@ -60,79 +60,120 @@ stocks = [
     "VOLTAS.NS", "WHIRLPOOL.NS", "WIPRO.NS", "YESBANK.NS", "ZEEL.NS", "ZYDUSLIFE.NS"
 ]
 
-# Breakout periods
-periods = {
-    "DAY HIGH": "1d",
-    "DAY LOW": "1d",
-    "WEEK HIGH": "5d",
-    "WEEK LOW": "5d",
-    "MONTH HIGH": "1mo",
-    "MONTH LOW": "1mo",
-    "3M HIGH": "3mo",
-    "3M LOW": "3mo",
-    "52W HIGH": "1y",
-    "52W LOW": "1y"
-}
+BATCH_SIZE = 7  # Small batch size for memory optimization
 
-@st.cache_data
-def get_history(symbol, period="1y"):
+# Auto-refresh every 2 seconds (2000 milliseconds)
+count = st_autorefresh(interval=2000, limit=None, key="datarefresh")
+
+def to_float(val):
     try:
-        return yf.Ticker(symbol).history(period=period)
+        return float(val)
     except Exception:
-        return pd.DataFrame()
+        return None
 
-def check_breakouts(symbol):
+def check_breakouts_batch(symbols):
     results = []
-    data = get_history(symbol)
-    if data.empty:
+    now_time = dt.datetime.now(IST).strftime("%H:%M:%S")
+    today = dt.datetime.now(IST).date()
+
+    try:
+        hist = yf.download(
+            symbols,
+            period="2d",
+            interval="1m",
+            progress=False,
+            group_by='ticker',
+            auto_adjust=False,
+            threads=True,
+            prepost=False
+        )
+    except Exception as e:
+        st.error(f"Error downloading batch data: {e}")
         return results
 
-    ltp = data["Close"].iloc[-1]
-    prev_close = data["Close"].iloc[-2] if len(data) > 1 else ltp
-    change_pct = ((ltp - prev_close) / prev_close) * 100 if prev_close else 0
-    now = dt.datetime.now().strftime("%d %b %Y, %I:%M:%S %p")
+    if hist.empty:
+        return results
 
-    for label, period in periods.items():
-        df = get_history(symbol, period=period)
-        if df.empty:
+    for symbol in symbols:
+        try:
+            if len(symbols) == 1:
+                df = hist[['Close', 'High', 'Low']].copy()
+            else:
+                if symbol not in hist.columns.levels[0]:
+                    continue
+                df = hist[symbol][['Close', 'High', 'Low']].astype('float32').copy()
+
+            df = df[~df.index.duplicated(keep='last')]
+
+            today_data = df[df.index.date == today]
+            if today_data.empty:
+                continue
+
+            ltp = to_float(df["Close"].iloc[-1])
+            today_high = to_float(today_data["High"].max())
+            today_low = to_float(today_data["Low"].min())
+
+            if ltp is None or today_high is None or today_low is None:
+                continue
+
+            if ltp >= today_high or ltp <= today_low:
+                results.append([
+                    symbol.replace(".NS", ""),
+                    "DAY HIGH" if ltp >= today_high else "DAY LOW",
+                    round(ltp, 2),
+                    now_time
+                ])
+
+            del df
+            gc.collect()
+
+        except Exception as e:
+            st.warning(f"Error processing {symbol}: {e}")
             continue
-        high = df["High"].max()
-        low = df["Low"].min()
 
-        if "HIGH" in label and ltp >= high:
-            results.append([symbol, round(ltp, 2), round(change_pct, 2), label, now, "High"])
-        elif "LOW" in label and ltp <= low:
-            results.append([symbol, round(ltp, 2), round(change_pct, 2), label, now, "Low"])
+    del hist
+    gc.collect()
+
     return results
 
-# Streamlit app
-st.set_page_config(page_title="Stock Breakout Scanner", layout="wide")
-st.title("📊 Stock Breakout Scanner (NSE F&O + US Stocks)")
+# Custom CSS for better table visibility
+st.markdown("""
+    <style>
+    .dataframe th, .dataframe td {
+        padding: 10px 12px !important;
+        font-size: 15px !important;
+    }
+    .dataframe th {
+        font-weight: bold !important;
+        background-color: #f0f0f0 !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-current_time = dt.datetime.now().time()
-if not (INDIAN_MARKET_START <= current_time <= INDIAN_MARKET_END):
-    st.warning("⚠️ Market closed. App runs between 9:15 AM - 3:30 PM IST.")
+st.set_page_config(page_title="Live Breakout Scanner", layout="wide")
+st.title("📈 Live Breakout Stocks (NSE India)")
+
+all_results = []
+
+for i in range(0, len(STOCKS), BATCH_SIZE):
+    batch = STOCKS[i:i+BATCH_SIZE]
+    batch_results = check_breakouts_batch(batch)
+    if batch_results:
+        all_results.extend(batch_results)
+
+if all_results:
+    columns = ["Name", "Breakout for", "LTP", "Time"]
+    df = pd.DataFrame(all_results, columns=columns)
+
+    def highlight_breakout(row):
+        if row["Breakout for"] == "DAY HIGH":
+            return ['background-color: #4CAF50; color: white; font-weight: bold; font-size: 16px'] * len(row)
+        elif row["Breakout for"] == "DAY LOW":
+            return ['background-color: #F44336; color: white; font-weight: bold; font-size: 16px'] * len(row)
+        else:
+            return [''] * len(row)
+
+    st.markdown("### 🔥 Breakout Stocks Detected")
+    st.dataframe(df.style.apply(highlight_breakout, axis=1), hide_index=True, use_container_width=True)
 else:
-    all_results = []
-    for stock in stocks:
-        all_results.extend(check_breakouts(stock))
-
-    if all_results:
-        df = pd.DataFrame(all_results, columns=["Symbol", "LTP", "%change", "Event", "Time", "Type"])
-        df = df.drop(columns=["Type"])  # Keep only display columns
-
-        def highlight(row):
-            if "HIGH" in row["Event"]:
-                return ["background-color: lightgreen"] * len(row)
-            elif "LOW" in row["Event"]:
-                return ["background-color: salmon"] * len(row)
-            return [""] * len(row)
-
-        st.dataframe(df.style.apply(highlight, axis=1), use_container_width=True)
-    else:
-        st.info("No breakouts found right now.")
-
-    # Auto refresh logic
-    time.sleep(REFRESH_INTERVAL)
-    st.rerun()
-
+    st.info("No breakout detected right now.")

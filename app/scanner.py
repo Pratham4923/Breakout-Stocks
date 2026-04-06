@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from collections import deque
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -45,6 +46,7 @@ class ScannerService:
         self._tasks: list[asyncio.Task] = []
         self._stream_task: asyncio.Task | None = None
         self._stream_generation = 0
+        self._is_vercel = bool(os.getenv("VERCEL"))
 
     async def start(self) -> None:
         self._tasks = [
@@ -74,6 +76,40 @@ class ScannerService:
             self.last_error = None
             self.healing_status = "Healthy"
         self._snapshot_dirty.set()
+
+    async def ensure_http_ready(self) -> None:
+        if not self._is_vercel:
+            return
+
+        needs_reference = False
+        needs_quotes = False
+        async with self._state_lock:
+            if not self.reference_levels:
+                needs_reference = True
+            elif self.last_reference_refresh:
+                try:
+                    last_refresh = datetime.fromisoformat(self.last_reference_refresh)
+                    needs_reference = (datetime.now(IST) - last_refresh) > timedelta(seconds=self.config.refresh_interval_seconds)
+                except ValueError:
+                    needs_reference = True
+            else:
+                needs_reference = True
+
+            if self._market_status() == "Open":
+                if not self.last_quote_at:
+                    needs_quotes = True
+                else:
+                    try:
+                        last_quote = datetime.fromisoformat(self.last_quote_at)
+                        needs_quotes = (datetime.now(IST) - last_quote) > timedelta(seconds=self.config.stream_stale_seconds)
+                    except ValueError:
+                        needs_quotes = True
+
+        if needs_reference:
+            await self.refresh_reference_levels()
+        if needs_quotes:
+            await asyncio.to_thread(self.refresh_quotes_from_http)
+            self._snapshot_dirty.set()
 
     async def get_snapshot(self) -> dict:
         async with self._state_lock:
@@ -444,6 +480,47 @@ class ScannerService:
             timestamp=timestamp,
         )
 
+    def refresh_quotes_from_http(self) -> None:
+        active_breakouts: dict[tuple[str, str, str], BreakoutAlert] = {}
+        movers_quotes: dict[str, Quote] = {}
+        recent_timestamp = None
+
+        for batch in self._chunked(self.config.symbols, self.config.history_download_chunk):
+            try:
+                history = yf.download(
+                    tickers=list(batch),
+                    period="2d",
+                    interval="1m",
+                    group_by="ticker",
+                    auto_adjust=False,
+                    progress=False,
+                    threads=True,
+                )
+            except Exception:
+                continue
+            if history.empty:
+                continue
+
+            for symbol in batch:
+                frame = self._extract_symbol_history(history, symbol, len(batch) == 1)
+                intraday = self._prepare_intraday_history(frame)
+                if intraday.empty:
+                    continue
+                quote = self._quote_from_intraday(symbol, intraday)
+                if quote is None:
+                    continue
+                movers_quotes[symbol] = quote
+                recent_timestamp = quote.timestamp
+                for alert in self._evaluate_breakouts(symbol, quote):
+                    active_breakouts[alert.key()] = alert
+
+        self.latest_quotes = movers_quotes
+        self.active_breakouts = active_breakouts
+        if recent_timestamp:
+            self.last_quote_at = recent_timestamp
+        self.healing_status = "Healthy"
+        self.last_error = None
+
     def _evaluate_breakouts(self, symbol: str, quote: Quote) -> list[BreakoutAlert]:
         levels = self.reference_levels.get(symbol, {})
         display_symbol = symbol.replace(".NS", "")
@@ -558,6 +635,41 @@ class ScannerService:
             return pd.DataFrame()
         frame = frame[available].copy()
         return frame[~frame.index.duplicated(keep="last")]
+
+    def _prepare_intraday_history(self, frame: pd.DataFrame) -> pd.DataFrame:
+        history = frame.dropna(subset=["High", "Low", "Close"]).copy()
+        if history.empty:
+            return history
+        if isinstance(history.index, pd.DatetimeIndex):
+            try:
+                local_index = history.index.tz_convert(IST) if history.index.tz is not None else history.index.tz_localize(IST)
+            except TypeError:
+                local_index = history.index
+            history.index = local_index
+            today = datetime.now(IST).date()
+            history = history[history.index.date == today]
+        return history
+
+    def _quote_from_intraday(self, symbol: str, history: pd.DataFrame) -> Quote | None:
+        if history.empty:
+            return None
+        latest = history.iloc[-1]
+        price = self._to_float(latest.get("Close"))
+        if price is None:
+            return None
+        prev_close = self._to_float(history.iloc[0].get("Close"))
+        change_percent = None
+        if prev_close not in (None, 0):
+            change_percent = ((price - prev_close) / prev_close) * 100
+        timestamp = history.index[-1].isoformat() if hasattr(history.index[-1], "isoformat") else datetime.now(IST).isoformat()
+        return Quote(
+            symbol=symbol,
+            price=price,
+            change_percent=change_percent,
+            day_high=self._to_float(history["High"].max()),
+            day_low=self._to_float(history["Low"].min()),
+            timestamp=timestamp,
+        )
 
     def _market_status(self) -> str:
         now = datetime.now(IST)

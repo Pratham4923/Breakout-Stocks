@@ -265,7 +265,7 @@
   </main>
 
   <script>
-    const state = { socket: null, soundEnabled: true, snapshot: null, filter: "" };
+    const state = { socket: null, soundEnabled: true, snapshot: null, filter: "", pollTimer: null, transport: "websocket" };
     const ids = {
       wsDot: document.getElementById("ws-dot"),
       wsLabel: document.getElementById("ws-label"),
@@ -299,6 +299,13 @@
     function websocketUrl() {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       return `${protocol}//${window.location.host}/ws`;
+    }
+    function isVercelHost() {
+      return window.location.hostname.endsWith(".vercel.app");
+    }
+    function setTransportLabel() {
+      const mode = state.transport === "polling" ? "HTTP polling" : "Live websocket";
+      setSocketStatus(state.transport !== "polling", `${mode} connected`);
     }
     function setSocketStatus(isLive, label) {
       ids.wsDot.classList.toggle("live", isLive);
@@ -446,10 +453,38 @@
       notifyAlert(alert);
       renderSnapshot(state.snapshot);
     }
+    async function fetchSnapshot() {
+      const response = await fetch("/api/snapshot", { cache: "no-store" });
+      if (!response.ok) throw new Error(`Snapshot failed: ${response.status}`);
+      const payload = await response.json();
+      renderSnapshot(payload);
+    }
+    function startPolling() {
+      if (state.pollTimer) return;
+      state.transport = "polling";
+      setSocketStatus(false, "Switching to HTTP polling...");
+      const tick = async () => {
+        try {
+          await fetchSnapshot();
+          ids.wsDot.classList.add("live");
+          ids.wsLabel.textContent = "HTTP polling active";
+        } catch (error) {
+          ids.wsDot.classList.remove("live");
+          ids.wsLabel.textContent = "Polling retrying...";
+        }
+      };
+      tick();
+      state.pollTimer = window.setInterval(tick, 15000);
+    }
     function connectSocket() {
+      if (isVercelHost()) {
+        startPolling();
+        return;
+      }
       setSocketStatus(false, "Connecting...");
       const socket = new WebSocket(websocketUrl());
       state.socket = socket;
+      state.transport = "websocket";
       socket.addEventListener("open", () => {
         setSocketStatus(true, "Live websocket connected");
         socket.send("snapshot");
@@ -463,7 +498,10 @@
         setSocketStatus(false, "Disconnected, retrying...");
         window.setTimeout(connectSocket, 1500);
       });
-      socket.addEventListener("error", () => setSocketStatus(false, "Connection error"));
+      socket.addEventListener("error", () => {
+        setSocketStatus(false, "Connection error");
+        if (isVercelHost()) startPolling();
+      });
     }
     ids.notifyBtn.addEventListener("click", async () => {
       if (!("Notification" in window)) return;
@@ -475,6 +513,10 @@
       ids.soundBtn.textContent = `Sound: ${state.soundEnabled ? "On" : "Off"}`;
     });
     ids.refreshBtn.addEventListener("click", () => {
+      if (state.transport === "polling") {
+        fetchSnapshot();
+        return;
+      }
       if (state.socket?.readyState === WebSocket.OPEN) state.socket.send("snapshot");
     });
     ids.filterInput.addEventListener("input", (event) => {

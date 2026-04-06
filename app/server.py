@@ -76,6 +76,7 @@ async def healthcheck() -> JSONResponse:
 
 @app.get("/api/snapshot")
 async def snapshot() -> JSONResponse:
+    await scanner.ensure_http_ready()
     return JSONResponse(await scanner.get_snapshot())
 
 

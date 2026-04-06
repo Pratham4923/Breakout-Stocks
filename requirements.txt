@@ -1,5 +1,4 @@
-streamlit>=1.25.0
-yfinance>=0.2.31
-pandas>=2.0.3
-numpy>=1.25.0
-streamlit_autorefresh
+fastapi>=0.116.0
+uvicorn[standard]>=0.35.0
+yfinance>=1.2.0
+pandas>=2.3.0

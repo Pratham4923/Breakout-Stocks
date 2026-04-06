@@ -1,80 +1,59 @@
-# 📈 Stock Breakout Scanner
+# Breakout Stocks
 
-A **real-time stock breakout scanner** built with **Streamlit** and **Yahoo Finance**.  
-It scans **NSE F&O stocks** (India) and selected **US stocks** for new **Highs and Lows** across different timeframes.
+Real-time NSE breakout scanner rebuilt around a websocket-first architecture.
 
----
+## What changed
 
-## ⚡ Features
-- Monitors **NSE F&O stocks only** 
-- Detects breakouts on:
-  - Day High/Low  
-  - 2 Days High/Low 
-  - Week  High/Low 
-  - 2 Weeks  High/Low 
-  - Month  High/Low 
-  - 3 Months  High/Low 
-  - 52 Weeks  High/Low
-    
-- Displays **symbol, LTP, % change, timestamp**
-- Color-coded:
-  - 🟩 Green → New High  
-  - 🟥 Red → New Low  
-- Updates **automatically every 8 seconds**
-- Lightweight and optimized for **trading hours (9:30 AM – 3:30 PM IST)**
+- Replaced the old single-file Streamlit poller with a `FastAPI` app
+- Added a browser dashboard that updates over a websocket connection
+- Added live alert feed with sound alerts and browser notifications
+- Switched quote ingestion to `yfinance.AsyncWebSocket` for faster updates
+- Moved breakout reference calculations into a background refresh job
+- Added a separate `SMC Concepts` section for BOS, liquidity sweeps, and fair value gap context
+- Added self-healing watchdog logic for stale stream detection and automatic session recovery
+- Added a health endpoint and snapshot API for easier debugging
 
----
+## Breakout scopes
 
-## 📦 Requirements
-- Python 3.9+  
-- `requirements.txt` dependencies:
-  ```txt
-  streamlit>=1.25.0
-  yfinance>=0.2.31
-  pandas>=2.0.3
-  numpy>=1.25.0
-  
-🚀 Setup & Run
+- `Live Day`
+- `Day`
+- `2 Days`
+- `Week`
+- `2 Weeks`
+- `Month`
+- `3 Months`
+- `52 Weeks`
 
-1️⃣ Clone or download this repository
+`Live Day` uses the quote stream's current session high and low. The other scopes are built from refreshed daily history.
 
-git clone https://github.com/Pratham4923/Breakout-Stocks.git
+## Run locally
 
-cd stock-scanner
+```bash
+python -m pip install -r requirements.txt
+python main.py
+```
 
-2️⃣ Install dependencies
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
-pip install -r requirements.txt
+## Optional environment variables
 
-3️⃣ Run the app
+- `HOST` default `127.0.0.1`
+- `PORT` default `8000`
+- `SCANNER_SYMBOLS` comma-separated custom symbol list
+- `REFRESH_INTERVAL_SECONDS` default `300`
+- `ALERT_COOLDOWN_SECONDS` default `300`
+- `QUOTE_SUBSCRIPTION_CHUNK` default `80`
+- `HISTORY_DOWNLOAD_CHUNK` default `30`
 
-streamlit run main.py
+## Endpoints
 
-⚡ One-Click Launch
-We’ve included launch scripts for Windows and Linux/Mac:
+- `/` dashboard
+- `/ws` dashboard websocket
+- `/api/snapshot` current scanner snapshot
+- `/healthz` health information
 
-▶ Windows
-Double-click:
+## Notes
 
-setup_and_run.bat
-
-▶ Linux/Mac
-bash
-
-chmod +x setup_and_run.sh
-
-./setup_and_run.sh
-
-📌 Notes
-
-Only NSE F&O stocks are supported for Indian markets
-
-Recommended usage: Run only during NSE market hours (9:30 AM – 3:30 PM IST) for best performance
-
-Future Improvements
-
-Alerts (email / Telegram / sound notifications)
-
-Custom stock lists
-
-Faster data fetching with multi-threading
+- Yahoo Finance data is intended for personal and educational use.
+- The scanner is optimized for NSE symbols from the original project list.
+- If Yahoo temporarily drops the stream, the app retries automatically.

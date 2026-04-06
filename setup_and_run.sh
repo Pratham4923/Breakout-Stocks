@@ -1,24 +1,7 @@
-#!/bin/bash
-echo "======================================="
-echo "   Stock Scanner Setup and Launcher"
-echo "======================================="
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Step 1 - Create virtual environment if it doesn’t exist
-if [ ! -d ".venv" ]; then
-    echo "Creating virtual environment..."
-    python3 -m venv .venv
-fi
+cd "$(dirname "$0")"
 
-# Step 2 - Activate virtual environment
-source .venv/bin/activate
-
-# Step 3 - Upgrade pip
-pip install --upgrade pip
-
-# Step 4 - Install requirements
-echo "Installing dependencies..."
-pip install -r requirements.txt
-
-# Step 5 - Run the Streamlit app
-echo "Starting Streamlit app..."
-streamlit run main.py
+python3 -m pip install -r requirements.txt
+python3 main.py

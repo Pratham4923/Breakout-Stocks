@@ -48,7 +48,7 @@ pip install -r requirements.txt
 
 3️⃣ Run the app
 
-streamlit run test.py
+streamlit run main.py
 
 ⚡ One-Click Launch
 We’ve included launch scripts for Windows and Linux/Mac:

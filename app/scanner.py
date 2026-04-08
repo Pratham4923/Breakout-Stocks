@@ -1,5 +1,3 @@
-# Scanner.py
-
 from __future__ import annotations
 
 import asyncio
@@ -13,6 +11,7 @@ import yfinance as yf
 
 from app.config import ScannerConfig
 from app.models import BreakoutAlert, BreakoutLevel, Quote, SmcSignal
+from signal_logger import log_signal                         # ← ADDED
 
 IST = ZoneInfo("Asia/Kolkata")
 LOOKBACK_WINDOWS = (
@@ -23,6 +22,35 @@ LOOKBACK_WINDOWS = (
     ("3 Months", 63),
     ("52 Weeks", 252),
 )
+
+# Tracks which (symbol, scope, direction) combos were logged today
+# so we never double-log the same signal in one session.
+_logged_today: set[str] = set()
+_logged_date: str = ""
+
+
+def _log_signal_once(alert: BreakoutAlert) -> None:
+    """Log a breakout/breakdown signal — once per symbol+scope+direction per day."""
+    global _logged_date, _logged_today
+    today = datetime.now(IST).strftime("%Y-%m-%d")
+    if today != _logged_date:          # new day → reset dedup set
+        _logged_date = today
+        _logged_today.clear()
+
+    key = f"{alert.symbol}_{alert.scope}_{alert.direction}_{today}"
+    if key in _logged_today:
+        return
+    _logged_today.add(key)
+
+    signal_type = "BREAKOUT" if alert.direction == "HIGH" else "BREAKDOWN"
+    log_signal(
+        symbol=alert.symbol,
+        signal_type=signal_type,
+        scope=alert.scope,
+        price_at_signal=alert.price,
+        prev_high=alert.threshold if alert.direction == "HIGH" else 0,
+        prev_low=alert.threshold if alert.direction == "LOW" else 0,
+    )
 
 
 class ScannerService:
@@ -285,6 +313,7 @@ class ScannerService:
                 self.last_alert_at[key] = datetime.now(IST)
                 self.recent_alerts.appendleft(alert)
                 alerts_to_emit.append(alert)
+                _log_signal_once(alert)                      # ← ADDED (1 line)
             self._drop_resolved_breakouts(symbol, quote)
 
         self._snapshot_dirty.set()
@@ -515,6 +544,7 @@ class ScannerService:
                 recent_timestamp = quote.timestamp
                 for alert in self._evaluate_breakouts(symbol, quote):
                     active_breakouts[alert.key()] = alert
+                    _log_signal_once(alert)                  # ← ADDED (1 line)
 
         self.latest_quotes = movers_quotes
         self.active_breakouts = active_breakouts

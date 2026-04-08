@@ -11,7 +11,7 @@ import yfinance as yf
 
 from app.config import ScannerConfig
 from app.models import BreakoutAlert, BreakoutLevel, Quote, SmcSignal
-from signal_logger import log_signal                         # ← ADDED
+from app.signal_logger import log_signal                         
 
 IST = ZoneInfo("Asia/Kolkata")
 LOOKBACK_WINDOWS = (

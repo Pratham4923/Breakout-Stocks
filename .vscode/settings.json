@@ -1,0 +1,14 @@
+{
+  "python.defaultInterpreterPath": "C:\\Users\\prath\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+  "python.analysis.extraPaths": [
+    "C:\\Users\\prath\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages",
+    "${workspaceFolder}",
+    "${workspaceFolder}\\app"
+  ],
+  "python.analysis.diagnosticMode": "workspace",
+  "pyrefly.importSearchPaths": [
+    "C:\\Users\\prath\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages",
+    "${workspaceFolder}",
+    "${workspaceFolder}\\app"
+  ]
+}

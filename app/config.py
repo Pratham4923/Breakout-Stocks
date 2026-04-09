@@ -28,3 +28,11 @@ class ScannerConfig:
     watchdog_interval_seconds: int = int(os.getenv("WATCHDOG_INTERVAL_SECONDS", "10"))
     max_smc_signals: int = int(os.getenv("MAX_SMC_SIGNALS", "40"))
     symbols: tuple[str, ...] = _parse_symbols(os.getenv("SCANNER_SYMBOLS"))
+
+    # Auth & SMTP Settings
+    jwt_secret: str = os.getenv("JWT_SECRET", "astraveda_god_mode_secret_key_999")
+    smtp_host: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user: str = os.getenv("SMTP_USER", "")
+    smtp_pass: str = os.getenv("SMTP_PASS", "")
+    smtp_from: str = os.getenv("SMTP_FROM", "auth@astraveda.com")

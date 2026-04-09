@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 import os
 from collections import deque
+from collections.abc import Iterator
 from datetime import datetime, timedelta
+from typing import Protocol
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -11,7 +13,17 @@ import yfinance as yf
 
 from app.config import ScannerConfig
 from app.models import BreakoutAlert, BreakoutLevel, Quote, SmcSignal
-from app.signal_logger import log_signal                         
+from app.signal_logger import log_signal
+
+
+class Broadcaster(Protocol):
+    @property
+    def connection_count(self) -> int: ...
+
+    async def broadcast(self, payload: dict) -> None: ...
+
+
+_USE_NUVAMA = bool(os.getenv("NUVAMA_API_KEY"))
 
 IST = ZoneInfo("Asia/Kolkata")
 LOOKBACK_WINDOWS = (
@@ -54,7 +66,7 @@ def _log_signal_once(alert: BreakoutAlert) -> None:
 
 
 class ScannerService:
-    def __init__(self, config: ScannerConfig, broadcaster) -> None:
+    def __init__(self, config: ScannerConfig, broadcaster: Broadcaster) -> None:
         self.config = config
         self.broadcaster = broadcaster
         self.reference_levels: dict[str, dict[str, BreakoutLevel]] = {}
@@ -227,11 +239,44 @@ class ScannerService:
                 raise
 
     async def _run_stream_session(self, generation: int) -> None:
+        """
+        Stream live quotes — uses Nuvama if credentials are set,
+        falls back to yfinance WebSocket automatically.
+        """
+        if _USE_NUVAMA:
+            await self._run_nuvama_stream(generation)
+        else:
+            await self._run_yfinance_stream(generation)
+
+    async def _run_nuvama_stream(self, generation: int) -> None:
+        """Live stream via Nuvama APIConnect."""
+        from app.nuvama_feed import NuvamaFeed
+
+        async def handler(payload: dict) -> None:
+            await self._handle_quote(payload, generation)
+
+        try:
+            feed = NuvamaFeed()
+            await feed.stream(
+                symbols=list(self.config.symbols),
+                handler=handler,
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error(
+                f"Nuvama stream failed: {exc} — falling back to yfinance"
+            )
+            await self._run_yfinance_stream(generation)
+
+    async def _run_yfinance_stream(self, generation: int) -> None:
+        """Original yfinance WebSocket stream (fallback)."""
         async def handler(payload: dict) -> None:
             await self._handle_quote(payload, generation)
 
         async with yf.AsyncWebSocket(verbose=False) as ws:
-            for symbols in self._chunked(self.config.symbols, self.config.quote_subscription_chunk):
+            for symbols in self._chunked(
+                self.config.symbols, self.config.quote_subscription_chunk
+            ):
                 await ws.subscribe(list(symbols))
             await ws.listen(handler)
 
@@ -712,7 +757,7 @@ class ScannerService:
         return "Open" if market_open <= now <= market_close else "Pre/Post"
 
     @staticmethod
-    def _chunked(items: tuple[str, ...], size: int):
+    def _chunked(items: tuple[str, ...], size: int) -> Iterator[tuple[str, ...]]:
         for index in range(0, len(items), size):
             yield items[index:index + size]
 

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AstraVeda | Focus Board</title>
+  <link rel="icon" type="image/png" href="/static/Favicon.png?v=2">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="/static/terminal.js" defer></script>
+</head>
+<body>
+  <div class="product-shell">
+    <nav class="nav-shell">
+      <a href="/dashboard" class="brand-shell">
+        <img src="/static/Logo.png" alt="AstraVeda logo" class="brand-logo">
+        <div class="brand-text">
+          <span class="brand-text-name">AstraVeda</span>
+          <span class="brand-text-sub">Institutional Terminal</span>
+        </div>
+      </a>
+      <div class="nav-links">
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+        <a href="/trades" class="nav-link">Flow</a>
+        <a href="/smc" class="nav-link">SMC</a>
+        <a href="/journal" class="nav-link">Journal</a>
+        <a href="/toolkit" class="nav-link active">Toolkit</a>
+      </div>
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <div class="status-pill">
+          <div class="status-indicator success" id="ws-dot"></div>
+          <span id="ws-label" class="font-mono" style="font-size: 0.7rem;">SYNC</span>
+        </div>
+        <button id="logout-btn" class="btn btn-ghost" style="padding: 8px 16px;">Logout</button>
+      </div>
+    </nav>
+
+    <main class="product-content">
+      <header style="margin-bottom: 48px;">
+        <span class="eyebrow">Market Intelligence</span>
+        <h1 class="font-serif">Focus Board.</h1>
+        <p style="color: var(--text-soft); max-width: 600px;">Narrows the market into a refined institutional watchlist. Professional operators eliminate noise to protect operative attention.</p>
+      </header>
+
+      <section class="metrics-grid">
+        <div class="glass-card metric-card">
+          <span class="metric-title">Lead Theme</span>
+          <div id="focus-theme" class="metric-value font-mono">Waiting</div>
+          <p id="focus-theme-copy" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 12px;">The current narrative leader.</p>
+        </div>
+        <div class="glass-card metric-card">
+          <span class="metric-title">Focus Width</span>
+          <div id="focus-width" class="metric-value font-mono">Narrow</div>
+          <p id="focus-width-copy" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 12px;">Current attention breadth status.</p>
+        </div>
+        <div class="glass-card metric-card">
+          <span class="metric-title">Ignore Count</span>
+          <div id="focus-ignore-count" class="metric-value font-mono">0</div>
+          <p id="focus-ignore-copy" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 12px;">Lower-priority names excluded.</p>
+        </div>
+      </section>
+
+      <div class="content-grid">
+        <div class="glass-card" style="padding: 32px;">
+          <h3 class="font-serif" style="font-size: 1.5rem; margin-bottom: 24px;">Focus Names</h3>
+          <div id="focus-board">
+            <div style="color: var(--text-dim); font-size: 0.85rem; text-align: center; padding: 48px; border: 1px dashed var(--border); border-radius: var(--radius-sm);">
+              Institutional focus names will populate here.
+            </div>
+          </div>
+        </div>
+        <div class="glass-card" style="padding: 32px;">
+          <h3 class="font-serif" style="font-size: 1.5rem; margin-bottom: 24px;">Ignore Matrix</h3>
+          <div id="focus-notes">
+            <div style="color: var(--text-dim); font-size: 0.85rem; text-align: center; padding: 48px; border: 1px dashed var(--border); border-radius: var(--radius-sm);">
+              Specific guidance for noise reduction.
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AstraVeda | Risk Manager</title>
+  <link rel="icon" type="image/png" href="/static/Favicon.png?v=2">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="/static/terminal.js" defer></script>
+</head>
+<body>
+  <div class="product-shell">
+    <nav class="nav-shell">
+      <a href="/dashboard" class="brand-shell">
+        <img src="/static/Logo.png" alt="AstraVeda logo" class="brand-logo">
+        <div class="brand-text">
+          <span class="brand-text-name">AstraVeda</span>
+          <span class="brand-text-sub">Institutional Terminal</span>
+        </div>
+      </a>
+      <div class="nav-links">
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+        <a href="/trades" class="nav-link">Flow</a>
+        <a href="/smc" class="nav-link">SMC</a>
+        <a href="/journal" class="nav-link">Journal</a>
+        <a href="/toolkit" class="nav-link active">Toolkit</a>
+      </div>
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <div class="status-pill">
+          <div class="status-indicator success" id="ws-dot"></div>
+          <span id="ws-label" class="font-mono" style="font-size: 0.7rem;">SYNC</span>
+        </div>
+        <button id="logout-btn" class="btn btn-ghost" style="padding: 8px 16px;">Logout</button>
+      </div>
+    </nav>
+
+    <main class="product-content">
+      <header style="margin-bottom: 48px;">
+        <span class="eyebrow">Capital Preservation</span>
+        <h1 class="font-serif">Institutional Risk.</h1>
+        <p style="color: var(--text-soft); max-width: 600px;">Define account parameters, exposure guardrails, and preferred risk profiles. Survival is the only prerequisite for success.</p>
+      </header>
+
+      <section class="metrics-grid">
+        <div class="glass-card metric-card">
+          <span class="metric-title">Trade Budget</span>
+          <div id="risk-budget-val" class="metric-value font-mono">-</div>
+        </div>
+        <div class="glass-card metric-card">
+          <span class="metric-title">Loss Cap</span>
+          <div id="risk-cap-val" class="metric-value font-mono">-</div>
+        </div>
+        <div class="glass-card metric-card">
+          <span class="metric-title">Target R:R</span>
+          <div id="risk-rr-val" class="metric-value font-mono">-</div>
+        </div>
+        <div class="glass-card metric-card">
+          <span class="metric-title">Risk Status</span>
+          <div id="risk-status-val" class="metric-value font-mono" style="color: var(--success);">Defensive</div>
+        </div>
+      </section>
+
+      <div class="content-grid">
+        <div class="glass-card" style="padding: 32px;">
+          <h3 class="font-serif" style="font-size: 1.5rem; margin-bottom: 24px;">Parameters Workspace</h3>
+          <form id="risk-form">
+            <div class="field-group">
+              <div class="field">
+                <label for="risk-account-size">Total Capital</label>
+                <input id="risk-account-size" type="number" min="0" step="1000" placeholder="100000">
+              </div>
+              <div class="field">
+                <label for="risk-per-trade">Risk / Trade (%)</label>
+                <input id="risk-per-trade" type="number" min="0" step="0.1" placeholder="1">
+              </div>
+            </div>
+            <div class="field-group" style="margin-top: 16px;">
+              <div class="field">
+                <label for="risk-max-daily-loss">Daily Limit (%)</label>
+                <input id="risk-max-daily-loss" type="number" min="0" step="0.1" placeholder="3">
+              </div>
+              <div class="field">
+                <label for="risk-preferred-rr">Min Acceptable R:R</label>
+                <input id="risk-preferred-rr" type="number" min="0" step="0.1" placeholder="2">
+              </div>
+            </div>
+            <div id="risk-error" style="color: var(--danger); font-size: 0.75rem; margin-top: 12px;"></div>
+            <button id="risk-submit" type="submit" class="btn btn-primary" style="width: 100%; margin-top: 24px;">Provision Parameters</button>
+          </form>
+        </div>
+
+        <div class="glass-card" style="padding: 32px;">
+          <h3 class="font-serif" style="font-size: 1.5rem; margin-bottom: 24px;">Execution Mandates</h3>
+          <div style="display: grid; gap: 20px;">
+            <div style="padding: 24px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: var(--radius-sm); transition: var(--transition-base);">
+                <span class="metric-title" style="font-size: 0.65rem; color: var(--text-muted);">Operational Compliance</span>
+                <p style="font-size: 0.95rem; color: var(--text-soft); margin-top: 12px; line-height: 1.6;">Strict adherence to the 1% per-trade risk cap is required for institutional compliance. Violation results in session termination.</p>
+            </div>
+            <div style="padding: 24px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: var(--radius-sm); transition: var(--transition-base);">
+                <span class="metric-title" style="font-size: 0.65rem; color: var(--text-muted);">Protective Kill-Switch</span>
+                <p style="font-size: 0.95rem; color: var(--text-soft); margin-top: 12px; line-height: 1.6;">The desk will automatically lock execution protocols upon reaching the 3% cumulative daily loss threshold.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
